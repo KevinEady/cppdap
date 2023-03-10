@@ -18,6 +18,7 @@
 #include "gtest/gtest.h"
 
 #include <chrono>
+#include <condition_variable>
 #include <thread>
 #include <vector>
 
@@ -48,6 +49,46 @@ TEST(Socket, SendRecv) {
   thread.join();
 
   ASSERT_EQ(read, expect);
+}
+
+// See https://github.com/google/cppdap/issues/101
+TEST(Socket, ClosesOnZeroByteRead) {
+  const char* port = "19022";
+
+  auto server = dap::Socket("localhost", port);
+
+  auto client = dap::Socket::connect("localhost", port, 0);
+  ASSERT_TRUE(client != nullptr);
+
+  bool connected = false;
+  std::condition_variable cv;
+  std::mutex mutex;  // guards 'connected'
+
+  auto thread = std::thread([&] {
+    auto conn = server.accept();
+    ASSERT_TRUE(conn != nullptr);
+
+    if (conn->isOpen()) {
+      std::unique_lock<std::mutex> lock(mutex);
+      connected = true;
+      cv.notify_all();
+    }
+
+    char c;
+    while (conn->isOpen()) {
+      conn->read(&c, 1);
+    }
+  });
+
+  {
+    std::unique_lock<std::mutex> lock(mutex);
+    auto did_connect =
+        cv.wait_for(lock, std::chrono::seconds(5), [&] { return connected; });
+    ASSERT_TRUE(did_connect);
+  }
+
+  client->close();
+  thread.join();
 }
 
 // See https://github.com/google/cppdap/issues/37

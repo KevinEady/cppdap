@@ -32,6 +32,7 @@
 #include <atomic>
 namespace {
 std::atomic<int> wsaInitCount = {0};
+using ssize_t = int;
 }  // anonymous namespace
 #else
 #include <fcntl.h>
@@ -201,13 +202,22 @@ class dap::Socket::Shared : public dap::ReaderWriter {
   }
 
   size_t read(void* buffer, size_t bytes) {
-    RLock lock(mutex);
-    if (s == InvalidSocket) {
+    ssize_t len;
+
+    {
+      RLock lock(mutex);
+      if (s == InvalidSocket) {
+        return 0;
+      }
+
+      len = recv(s, reinterpret_cast<char*>(buffer), static_cast<int>(bytes), 0);
+    }
+
+    if (len <= 0) {
+      close();
       return 0;
     }
-    auto len =
-        recv(s, reinterpret_cast<char*>(buffer), static_cast<int>(bytes), 0);
-    return (len < 0) ? 0 : len;
+    return len;
   }
 
   bool write(const void* buffer, size_t bytes) {
