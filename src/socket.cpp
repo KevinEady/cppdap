@@ -32,6 +32,7 @@
 #include <atomic>
 namespace {
 std::atomic<int> wsaInitCount = {0};
+using ssize_t = int;
 }  // anonymous namespace
 #else
 #include <fcntl.h>
