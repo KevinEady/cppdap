@@ -51,6 +51,14 @@ class Server {
                      const OnConnect& callback,
                      const OnError& onError = ignoreErrors) = 0;
 
+  // start() begins listening for connections on the given address and port.
+  // callback will be called for each connection.
+  // onError will be called for any connection errors.
+  virtual bool start(const char* address,
+                     int port,
+                     const OnConnect& callback,
+                     const OnError& onError = ignoreErrors) = 0;
+
   // stop() stops listening for connections.
   // stop() is implicitly called on destruction.
   virtual void stop() = 0;
